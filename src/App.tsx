@@ -1,154 +1,37 @@
 /* eslint-disable max-len */
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserWarning } from './UserWarning';
-import {
-  USER_ID,
-  deleteTodo,
-  getTodos,
-  makeTodo,
-  updateTodo,
-} from './api/todos';
-import { Footer } from './components/Footer/Footer';
-import { Header } from './components/Header/Header';
-import { TodoList } from './components/TodoList/TodoList';
+import { USER_ID, getTodos } from './api/todos';
 import { Todo } from './types/Todo';
-import { Errors } from './components/Errors/Errors';
-import { TodoStatus } from './types/TodoStatus';
-import { Error } from './types/Error';
+import { Status } from './types/Status';
+import { Header } from './components/Header/Header';
+import { getVisibleTodos } from './utils/getVisibleTodos';
+import { TodoList } from './components/TodoList/TodoList';
+import { Footer } from './components/Footer/Footer';
+import { TodoItem } from './components/TodoItem/TodoItem';
+import { ErrorNotification } from './components/Errors/Errors';
+import { ErrorMessages } from './types/ErrorMessages';
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [status, setStatus] = useState<TodoStatus>(TodoStatus.all);
-  const [error, setError] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState(Status.All);
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
-  const [loadingTodos, setLoadingTodos] = useState<number[]>([]);
+  const [loadingId, setLoadingId] = useState<number[]>([]);
 
   useEffect(() => {
     getTodos()
       .then(setTodos)
-      .catch(() => setError(Error.UnableLoadTodo));
+      .catch(() => setErrorMessage(ErrorMessages.UnableLoadTodos))
+      .finally(() => {
+        setTimeout(() => {
+          setErrorMessage('');
+        }, 3000);
+      });
   }, []);
 
-  useEffect(() => {
-    if (!error) {
-      return;
-    }
-
-    const timeout = setTimeout(() => setError(''), 3000);
-
-    return () => clearTimeout(timeout);
-  }, [error]);
-
-  const titleField = useRef<HTMLInputElement>(null);
-  const [title, setTitle] = useState('');
-
-  useEffect(() => {
-    if (titleField.current) {
-      titleField.current?.focus();
-    }
-  }, [todos]);
-
-  const handleAddTodo = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const trimTitle = title.trim();
-
-    if (!trimTitle) {
-      setError(Error.EmptyTodoTitle);
-
-      return;
-    }
-
-    if (titleField.current) {
-      titleField.current.disabled = true;
-    }
-
-    const newTodo: Omit<Todo, 'id'> = {
-      title: trimTitle,
-      completed: false,
-      userId: USER_ID,
-    };
-
-    setTempTodo({
-      id: 0,
-      ...newTodo,
-    });
-
-    setLoadingTodos(current => [...current, 0]);
-
-    makeTodo(newTodo)
-      .then(newTodoFromServer => {
-        setTodos(currentTodos => [...currentTodos, newTodoFromServer]);
-        setTitle('');
-      })
-      .catch(() => setError(Error.UnableAddTodo))
-      .finally(() => {
-        if (titleField.current) {
-          titleField.current.disabled = false;
-          titleField.current.focus();
-        }
-
-        setTempTodo(null);
-        setLoadingTodos(current => current.filter(todoId => todoId !== 0));
-      });
-  };
-
-  const handleUpdateTodo = (updatedTodo: Todo) => {
-    setLoadingTodos(current => [...current, updatedTodo.id]);
-
-    updateTodo(updatedTodo)
-      .then(todo => {
-        setTodos(currentTodos =>
-          currentTodos.map(t => (t.id === updatedTodo.id ? todo : t)),
-        );
-      })
-      .catch(() => setError(Error.UnableUpdateTodo))
-      .finally(() =>
-        setLoadingTodos(current =>
-          current.filter(todoId => todoId !== updatedTodo.id),
-        ),
-      );
-  };
-
-  const handleDeleteTodo = (todoId: number) => {
-    setLoadingTodos(current => [...current, todoId]);
-
-    deleteTodo(todoId)
-      .then(() =>
-        setTodos(currentTodos =>
-          currentTodos.filter(todo => todo.id !== todoId),
-        ),
-      )
-      .catch(() => setError(Error.UnableDeleteTodo))
-      .finally(() => {
-        setLoadingTodos(current =>
-          current.filter(removedTodoId => todoId !== removedTodoId),
-        );
-      });
-  };
-
-  const deleteAllCompleted = () => {
-    const completedTodos = todos.filter(todo => todo.completed);
-    const completedTodoIds = completedTodos.map(todo => todo.id);
-
-    setLoadingTodos(current => [...current, ...completedTodoIds]);
-
-    completedTodos.forEach(todo => {
-      deleteTodo(todo.id)
-        .then(() => {
-          setTodos(currentTodos =>
-            currentTodos.filter(currentTodo => currentTodo.id !== todo.id),
-          );
-        })
-        .catch(() => setError(Error.UnableDeleteTodo))
-        .finally(() => {
-          setLoadingTodos(current =>
-            current.filter(loadingTodoId => loadingTodoId !== todo.id),
-          );
-        });
-    });
-  };
+  const filteredTodos = getVisibleTodos(todos, selectedStatus);
 
   if (!USER_ID) {
     return <UserWarning />;
@@ -161,34 +44,45 @@ export const App: React.FC = () => {
       <div className="todoapp__content">
         <Header
           todos={todos}
-          handleAddTodo={handleAddTodo}
-          titleField={titleField}
-          title={title}
-          setTitle={setTitle}
+          loadingIds={loadingId}
           setTodos={setTodos}
-          loadingTodos={loadingTodos}
+          setTempTodo={setTempTodo}
+          setErrorMessage={setErrorMessage}
+          setLoadingIds={setLoadingId}
         />
-
         <TodoList
-          visibleTodos={todos}
-          tempTodo={tempTodo}
-          status={status}
-          onDelete={handleDeleteTodo}
-          onUpdate={handleUpdateTodo}
-          loadingTodos={loadingTodos}
+          todos={filteredTodos}
+          loadingIds={loadingId}
+          setTodos={setTodos}
+          setErrorMessage={setErrorMessage}
+          setLoadingIds={setLoadingId}
         />
-
-        {!!todos.length && (
+        {tempTodo && (
+          <TodoItem
+            todo={tempTodo}
+            isTemp={true}
+            loadingIds={loadingId}
+            setTodos={setTodos}
+            setErrorMessage={setErrorMessage}
+            setLoadingIds={setLoadingId}
+          />
+        )}
+        {todos.length > 0 && (
           <Footer
             todos={todos}
-            status={status}
-            setStatus={setStatus}
-            onRemoveTodo={deleteAllCompleted}
+            selectedStatus={selectedStatus}
+            setSelectedStatus={setSelectedStatus}
+            setTodos={setTodos}
+            setErrorMessage={setErrorMessage}
+            setLoadingIds={setLoadingId}
           />
         )}
       </div>
 
-      <Errors error={error} setError={setError} />
+      <ErrorNotification
+        errorMessage={errorMessage}
+        setErrorMessage={setErrorMessage}
+      />
     </div>
   );
 };

@@ -1,14 +1,15 @@
+import { Status } from '../types/Status';
 import { Todo } from '../types/Todo';
-import { TodoStatus } from '../types/TodoStatus';
 
-export const getVisibleTodos = (todos: Todo[], status: TodoStatus) => {
-  let visibleTodos = [...todos];
+export const getVisibleTodos = (todos: Todo[], status: Status) => {
+  switch (status) {
+    case Status.Active:
+      return todos.filter(todo => !todo.completed);
 
-  if (status !== TodoStatus.all) {
-    visibleTodos = visibleTodos.filter(todo => {
-      return status === TodoStatus.active ? !todo.completed : todo.completed;
-    });
+    case Status.Completed:
+      return todos.filter(todo => todo.completed);
+
+    default:
+      return todos;
   }
-
-  return visibleTodos;
 };

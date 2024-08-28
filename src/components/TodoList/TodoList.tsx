@@ -1,52 +1,34 @@
 import React from 'react';
-import { TodoItem } from '../TodoItem/TodoItem';
 import { Todo } from '../../types/Todo';
-import { TodoStatus } from '../../types/TodoStatus';
-import { FilteredTodos } from '../../utils/FilteredTodos';
+import { TodoItem } from '../TodoItem/TodoItem';
 
-type Props = {
-  visibleTodos: Todo[];
-  tempTodo: Todo | null;
-  status: TodoStatus;
-  loadingTodos: number[];
-  onDelete: (id: number) => void;
-  onUpdate: (todo: Todo) => void;
-};
-
+interface Props {
+  todos: Todo[];
+  loadingIds: number[];
+  setTodos: React.Dispatch<React.SetStateAction<Todo[]>>;
+  setErrorMessage: (message: string) => void;
+  setLoadingIds: React.Dispatch<React.SetStateAction<number[]>>;
+}
 export const TodoList: React.FC<Props> = ({
-  visibleTodos,
-  tempTodo,
-  status,
-  loadingTodos,
-  onDelete,
-  onUpdate,
+  todos,
+  loadingIds,
+  setTodos,
+  setErrorMessage,
+  setLoadingIds,
 }) => {
-  const filteredTodos = FilteredTodos(visibleTodos, status);
-
-  const handleToggle = (todo: Todo) => {
-    onUpdate({ ...todo, completed: !todo.completed });
-  };
-
-  const handleUpdate = (todo: Todo, newTitle: string) => {
-    onUpdate({ ...todo, title: newTitle });
-  };
-
   return (
     <section className="todoapp__main" data-cy="TodoList">
-      {filteredTodos.map(todo => (
+      {todos.map(todo => (
         <TodoItem
-          key={todo.id}
           todo={todo}
-          onDelete={() => onDelete(todo.id)}
-          onToggle={() => handleToggle(todo)}
-          onUpdate={newTitle => handleUpdate(todo, newTitle)}
-          isLoading={loadingTodos.includes(todo.id)}
+          isTemp={false}
+          loadingIds={loadingIds}
+          setTodos={setTodos}
+          setErrorMessage={setErrorMessage}
+          setLoadingIds={setLoadingIds}
+          key={todo.id}
         />
       ))}
-
-      {tempTodo && (
-        <TodoItem todo={tempTodo} isLoading={loadingTodos.includes(0)} />
-      )}
     </section>
   );
 };

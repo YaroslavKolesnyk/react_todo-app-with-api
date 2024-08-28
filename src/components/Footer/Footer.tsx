@@ -1,73 +1,89 @@
 import React from 'react';
 import { Todo } from '../../types/Todo';
-import classNames from 'classnames';
-import { TodoStatus } from '../../types/TodoStatus';
+import { Status } from '../../types/Status';
+import { ErrorMessages } from '../../types/ErrorMessages';
+import { deleteTodos } from '../../api/todos';
 
-type Props = {
+interface Props {
   todos: Todo[];
-  status: TodoStatus;
-  setStatus: (status: TodoStatus) => void;
-  onRemoveTodo: () => void;
-};
+  selectedStatus: Status;
+  setSelectedStatus: (status: Status) => void;
+  setTodos: React.Dispatch<React.SetStateAction<Todo[]>>;
+  setErrorMessage: (message: string) => void;
+  setLoadingIds: React.Dispatch<React.SetStateAction<number[]>>;
+}
 
 export const Footer: React.FC<Props> = ({
   todos,
-  status,
-  setStatus,
-  onRemoveTodo,
+  selectedStatus,
+  setSelectedStatus,
+  setTodos,
+  setErrorMessage,
+  setLoadingIds,
 }) => {
-  const remainingTodos = todos.filter(todo => !todo.completed).length;
-  const completedTodos = todos.filter(todo => todo.completed).length;
+  const todosLeft = todos.filter(todo => !todo.completed).length;
+  const hasCompleted = todos.filter(todo => todo.completed);
+
+  const handleClearCompleted = () => {
+    const deletePromise = hasCompleted.map(todo => {
+      setLoadingIds(prevIds => [...prevIds, todo.id]);
+
+      return deleteTodos(todo.id)
+        .then(() => {
+          setTodos(prevTodos => prevTodos.filter(item => item.id !== todo.id));
+        })
+        .catch(() => {
+          setErrorMessage(ErrorMessages.UnableDelete);
+        })
+        .finally(() => {
+          setLoadingIds(prevIds => prevIds.filter(id => id !== todo.id));
+        });
+    });
+
+    return deletePromise;
+  };
 
   return (
     <footer className="todoapp__footer" data-cy="Footer">
       <span className="todo-count" data-cy="TodosCounter">
-        {remainingTodos} items left
+        {`${todosLeft} ${todosLeft === 1 ? 'item' : 'items'} left`}
       </span>
 
-      {/* Active link should have the 'selected' class */}
       <nav className="filter" data-cy="Filter">
         <a
           href="#/"
-          className={classNames('filter__link', {
-            selected: status === TodoStatus.all,
-          })}
+          className={`filter__link ${selectedStatus === Status.All ? 'selected' : ''}`}
           data-cy="FilterLinkAll"
-          onClick={() => setStatus(TodoStatus.all)}
+          onClick={() => setSelectedStatus(Status.All)}
         >
           All
         </a>
 
         <a
           href="#/active"
-          className={classNames('filter__link', {
-            selected: status === TodoStatus.active,
-          })}
+          className={`filter__link ${selectedStatus === Status.Active ? 'selected' : ''}`}
           data-cy="FilterLinkActive"
-          onClick={() => setStatus(TodoStatus.active)}
+          onClick={() => setSelectedStatus(Status.Active)}
         >
           Active
         </a>
 
         <a
           href="#/completed"
-          className={classNames('filter__link', {
-            selected: status === TodoStatus.completed,
-          })}
+          className={`filter__link ${selectedStatus === Status.Completed ? 'selected' : ''}`}
           data-cy="FilterLinkCompleted"
-          onClick={() => setStatus(TodoStatus.completed)}
+          onClick={() => setSelectedStatus(Status.Completed)}
         >
           Completed
         </a>
       </nav>
 
-      {/* this button should be disabled if there are no completed todos */}
       <button
         type="button"
         className="todoapp__clear-completed"
         data-cy="ClearCompletedButton"
-        disabled={!completedTodos}
-        onClick={onRemoveTodo}
+        disabled={!hasCompleted.length}
+        onClick={handleClearCompleted}
       >
         Clear completed
       </button>
